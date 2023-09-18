@@ -1,7 +1,8 @@
-import * as LitJsSdk from "lit-js-sdk";
+import { LitNodeClient, uint8arrayFromString, checkAndSignAuthMessage } from '@lit-protocol/lit-node-client';
 
-const client = new LitJsSdk.LitNodeClient()
-const chain = 'ethereum'
+const client = new LitNodeClient();
+const chain = 'ethereum';
+//const litNodeClient = new LitNodeClient();
 
 /** 
  * Access control for a wallet with > 0.00001 ETH
@@ -24,7 +25,7 @@ const chain = 'ethereum'
  */
 
 // Must hold at least one Monster Suit NFT (https://opensea.io/collection/monster-suit)
-const accessControlConditionsNFT = [
+const accessControlConditions = [
     {
       contractAddress: '0x89b597199dac806ceecfc091e56044d34e59985c',
       standardContractType: 'ERC721',
@@ -52,42 +53,43 @@ class Lit {
     if (!this.litNodeClient) {
       await this.connect()
     }
-    const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain })
-    const { encryptedString, symmetricKey } = await LitJsSdk.encryptString(str)
 
-    const encryptedSymmetricKey = await this.litNodeClient.saveEncryptionKey({
-      accessControlConditions: accessControlConditionsNFT,
-      symmetricKey,
-      authSig,
-      chain,
-    })
+    try {
+      const encrypted = await client.encrypt({
+        dataToEncrypt: uint8arrayFromString(str),
+          chain,
+          accessControlConditions,
+      });
 
-    return {
-      encryptedFile: encryptedString,
-      encryptedSymmetricKey: LitJsSdk.uint8arrayToString(encryptedSymmetricKey, "base16")
+      return encrypted;
+    } catch (e) {
+      throw new Error('Unable to encrypt content: ' + e);
     }
   }
 
-  async decryptString(encryptedStr, encryptedSymmetricKey) {
+  async decryptString(ciphertext, dataToEncryptHash) {
     if (!this.litNodeClient) {
       await this.connect()
     }
-    const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain })
-    const symmetricKey = await this.litNodeClient.getEncryptionKey({
-      accessControlConditions: accessControlConditionsNFT,
-      toDecrypt: encryptedSymmetricKey,
-      chain,
-      authSig
-    })
-    const decryptedFile = await LitJsSdk.decryptString(
-      encryptedStr,
-      symmetricKey
-    );
-    // eslint-disable-next-line no-console
-    console.log({
-      decryptedFile
-    })
-    return { decryptedFile }
+    const authSig = await checkAndSignAuthMessage({
+      chain
+    });
+
+    console.log("ciphertext: ", ciphertext);
+    console.log("data to encrypt: ", ciphertext);
+    try {
+      return await client.decrypt(
+        {
+          accessControlConditions,
+          ciphertext,
+          dataToEncryptHash,
+          authSig,
+          chain: 'ethereum',
+        },
+      );
+    } catch (e) {
+      throw new Error('Unable to decrypt content: ' + e);
+    }
   }
 }
 

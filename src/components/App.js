@@ -22,8 +22,8 @@ const client = create({
 
 function App() {
   const [file, setFile] = useState(null);
-  const [encryptedUrlArr, setEncryptedUrlArr] = useState([]);
-  const [encryptedKeyArr, setEncryptedKeyArr] = useState([]);
+  const [encryptedCipherArr, setEncryptedCipherArr] = useState([]);
+  const [encryptedEncryptedHashArr, setEncryptedHashArr] = useState([]);
   const [decryptedFileArr, setDecryptedFileArr] = useState([]);
 
   function retrieveFile(e) {
@@ -39,9 +39,9 @@ function App() {
   }
 
   function decrypt() {
-    if (encryptedUrlArr.length !== 0) {
-      Promise.all(encryptedUrlArr.map((url, idx) => {
-        return lit.decryptString(url, encryptedKeyArr[idx]);
+    if (encryptedCipherArr.length !== 0) {
+      Promise.all(encryptedCipherArr.map((url, idx) => {
+        return lit.decryptString(url, encryptedEncryptedHashArr[idx]);
       })).then((values) => {
         setDecryptedFileArr(values.map((v) => {
           return v.decryptedFile;
@@ -58,11 +58,13 @@ function App() {
       const url = `https://infura-ipfs.io/ipfs/${created.path}`;
 
       const encrypted = await lit.encryptString(url);
-      console.log('IPFS URL: ', url);
-      console.log('Encrypted String: ', encrypted.encryptedFile);
 
-      setEncryptedUrlArr((prev) => [...prev, encrypted.encryptedFile]);
-      setEncryptedKeyArr((prev) => [...prev, encrypted.encryptedSymmetricKey]);
+      console.log('IPFS URL: ', url);
+      console.log('ciphertext: ', encrypted.ciphertext);
+      console.log('data to encrypt hash: ', encrypted.dataToEncryptHash);
+
+      setEncryptedCipherArr((prev) => [...prev, encrypted.ciphertext]);
+      setEncryptedHashArr((prev) => [...prev, encrypted.dataToEncryptHash]);
     } catch (error) {
       console.log(error.message);
     }
