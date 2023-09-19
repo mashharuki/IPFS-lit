@@ -1,12 +1,12 @@
-import { LitNodeClient, uint8arrayFromString, checkAndSignAuthMessage } from '@lit-protocol/lit-node-client';
+import * as LitJsSdk from '@lit-protocol/lit-node-client';
 
-const client = new LitNodeClient();
+const litNodeClient = new LitJsSdk.LitNodeClient({
+  litNetwork: 'cayenne',
+});
 const chain = 'ethereum';
-//const litNodeClient = new LitNodeClient();
 
-/** 
- * Access control for a wallet with > 0.00001 ETH
- * const accessControlConditionsETHBalance = [
+// Must hold at least 0.00001 ETH
+const accs = [
   {
     contractAddress: '',
     standardContractType: '',
@@ -22,44 +22,27 @@ const chain = 'ethereum';
     }
   }
 ]
- */
-
-// Must hold at least one Monster Suit NFT (https://opensea.io/collection/monster-suit)
-const accessControlConditions = [
-    {
-      contractAddress: '0x89b597199dac806ceecfc091e56044d34e59985c',
-      standardContractType: 'ERC721',
-      chain,
-      method: 'balanceOf',
-      parameters: [
-        ':userAddress'
-      ],
-      returnValueTest: {
-        comparator: '>',
-        value: '0'
-      }
-    }
-  ]
 
 class Lit {
-  litNodeClient
-
   async connect() {
-    await client.connect()
-    this.litNodeClient = client
+    await litNodeClient.connect()
   }
 
-  async encryptString(str) {
-    if (!this.litNodeClient) {
+  async encryptString(url) {
+    if (!litNodeClient) {
       await this.connect()
     }
 
+    console.log('url of uploaded file ', url);
+    const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'ethereum' });
+
     try {
-      const encrypted = await client.encrypt({
-        dataToEncrypt: uint8arrayFromString(str),
-          chain,
-          accessControlConditions,
-      });
+      const encrypted = await LitJsSdk.encryptString({
+        dataToEncrypt: url,
+        chain,
+        authSig,
+        accessControlConditions: accs,
+      }, litNodeClient);
 
       return encrypted;
     } catch (e) {
@@ -68,23 +51,21 @@ class Lit {
   }
 
   async decryptString(ciphertext, dataToEncryptHash) {
-    if (!this.litNodeClient) {
+    if (!litNodeClient) {
       await this.connect()
     }
-    const authSig = await checkAndSignAuthMessage({
-      chain
-    });
+    const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain });
 
-    console.log("ciphertext: ", ciphertext);
-    console.log("data to encrypt: ", ciphertext);
+    console.log('ciphertext: ', ciphertext);
+    console.log('data to encrypt: ', ciphertext);
     try {
-      return await client.decrypt(
+      return await this.litNodeClient.decryptToString(
         {
-          accessControlConditions,
+          accessControlConditions: accs,
           ciphertext,
           dataToEncryptHash,
           authSig,
-          chain: 'ethereum',
+          chain,
         },
       );
     } catch (e) {
