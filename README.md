@@ -1,9 +1,9 @@
 # Unlockable Content with IPFS x Lit
 
 ![Image for application](/public/UnlockableContent.png)
-To show how to use Lit, we’ll build a DApp with a React frontend. The DApp connects to [IPFS (InterPlanetary File System)](https://docs.ipfs.tech/concepts/what-is-ipfs/) to upload files, stores the Lit encrypted IPFS content identifier (CID) to the application’s state, and decrypts the CID to display the uploaded file. The access control conditions for encrypting and decrypting the file will be whether or not the connected wallet holds a [Monster Suit NFT](https://opensea.io/collection/monster-suit).
+To show how to use Lit, we’ll build a DApp with a React frontend. The DApp connects to [IPFS (InterPlanetary File System)](https://docs.ipfs.tech/concepts/what-is-ipfs/) to upload images or files, stores the Lit encrypted IPFS content identifier (CID) to the application’s state, and decrypts the CID to display the uploaded file. The access control conditions for encrypting and decrypting the file will be whether or not the connected wallet holds at least  0.00001 ETH.
 
-Currently, there are a few platforms that support NFTs with unlockable content. Generally, content that is unlockable is only unlockable on the platform it was created on. What is unlockable on OpenSea is not unlockable on Zora.
+Generally, content that is unlockable is only unlockable on the platform it was created on. What is unlockable on OpenSea is not unlockable on Zora.
 
 Using Lit Protocol, it's possible to provision decryption keys so any content can be decentralized and private, essentially encrypted and unlockable. Imagine a future where an NFT that is unlockable on OpenSea is unlockable on SolSea. Additionally, Lit Protocol makes it possible to have unlockable content accessible outside of traditional NFT platforms. One example is token gating items in a Shopify store.
 
@@ -17,20 +17,31 @@ Use of IPFS in the wild:
 
 - [Ceramic](https://ceramic.network/), which builds and extends IPFS to create open source data streams.
 
-This guide starts with a base React application with IPFS set up. You can fork [this branch of the project](https://github.com/debbly/IPFS-lit/tree/without-lit) and follow along or see the complete code with Lit [here](https://github.com/debbly/IPFS-lit).
+This guide starts with a base React application with IPFS set up. You can fork [this branch of the project](https://github.com/debbly/IPFS-lit/tree/without-lit) and follow along or see the complete code with Lit [here](https://github.com/debbly/IPFS-lit/tree/lit-sdk-v3).
 
 ![Lit site GIF](/public/lit.gif)
 
 The full process for uploading and viewing the files should not change significantly from the base IPFS application to the application that uses Lit Protocol. The main visual addition is the decryption button.
 
-## **Installation and Initializing Lit** 
+## Initializing the Project with Infura
 
 Update the IPFS projectID and projectSecret to your IPFS project information. If you do not have an Infura account, go [here](https://infura.io/) to sign up.
 
-Add the Lit JS SDK to your project.
+Make sure you update the keys and secret in `App.js`
+
+```js
+const projectId = '';   // <---------- your Infura Project ID
+
+const projectSecret = '';   // <---------- your Infura Secret
+//(for security concerns, consider saving these values in .env files)
+```
+
+## **Installation and Initializing Lit** 
+
+Add the Lit JS SDK to your project. Make sure you are on version 3.0.1 or higher.
 
 ```jsx
-yarn add lit-js-sdk
+yarn add @lit-protocol/lit-node-client@3.0.1
 ```
 
 Within your /src folder, create a lib folder and create a lit.js file.
@@ -38,13 +49,15 @@ Within your /src folder, create a lib folder and create a lit.js file.
 At the top of the lit.js file, include the Lit JS SDK
 
 ```jsx
-import * as LitJsSdk from "lit-js-sdk";
+import * as LitJsSdk from '@lit-protocol/lit-node-client';
 ```
 
- The SDK requires an active connection to the LIT nodes to store and retrieve encryption keys and signing requests. We’ll initialize a LitNodeClient and set it within the connect function.
+ The SDK requires an active connection to the LIT nodes to store and retrieve encryption keys and signing requests. We’ll initialize a LitNodeClient and by calling `connect()`. The `connect()` function returns a Promise that resolves when a connection the Lit nodes is established. Make sure you are connected before doing any calls with the `LitNodeClient`.
 
 ```jsx
-const client = new LitJsSdk.LitNodeClient();
+const client = new LitJsSdk.LitNodeClient({
+  litNetwork: 'cayenne',
+});
 
 class Lit {
   litNodeClient;
@@ -66,32 +79,28 @@ Before the Lit class, we are going to set a global access control condition. [Ac
 - User owns a specific wallet address
 - Using boolean operations (AND + OR) for any of the above
 
-For this example, we are going to set the access control on if the wallet contains at least one [Monster Suit NFT](https://opensea.io/collection/monster-suit).
+For this example, we are going to set the access control on if the wallet contains at least 0.00001 ETH.
 
 ```jsx
 const chain = 'ethereum'
 
-// Must hold at least one Monster Suit NFT ([https://opensea.io/collection/monster-suit](https://opensea.io/collection/monster-suit))
 const accessControlConditionsNFT = [
-	{
-		contractAddress: '0x89b597199dAc806Ceecfc091e56044D34E59985c',
-		standardContractType: 'ERC721',
-		chain,
-		method: 'balanceOf',
-		parameters: [
-			':userAddress'
-		],
-		returnValueTest: {
-			comparator: '>',
-			value: '0'
-		}
-	}
-];
+  {
+    contractAddress: '',
+    standardContractType: '',
+    chain,
+    method: 'eth_getBalance',
+    parameters: [
+      ':userAddress',
+      'latest'
+    ],
+    returnValueTest: {
+      comparator: '>=',
+      value: '10000000000000'
+    }
+  }
+]
 ```
-
-The contract address of the NFT collection is: `0x89b597199dAc806Ceecfc091e56044D34E59985c` and the contract type is `ERC721`.
-
-Within the returnValueTest is where we check that the wallet contains at least one Monster Suit NFT.
 
 ## **Encrypt and Upload**
 
@@ -107,37 +116,32 @@ async encryptString(str) {
   }
 ```
 
-Within the encryptString function, we will encrypt the string and tell the Lit Node Client to save the relationship between the access control condition(s) and the symmetric key. This will be necessary for decrypting.
+Within the encryptString function, we will encrypt the string and tell the `LitNodeClient` to save the relationship between the access control condition(s) and the content. This will be necessary for decrypting.
 
 Lit functions explained:
 
 - **checkAndSignAuthMessage**: Checks for an existing cryptographic authentication signature and creates one if it doesn’t exist. This is used to prove ownership of a given wallet address to the Lit nodes.
 - **encryptString**: Encrypts any string.
-- **saveEncryptionKey**: Securely saves the association between access control conditions and the content we want to decrypt.
-- **uint8arrayToString**: Helper function that converts a Uint8Array to a string.
 
 ```jsx
 const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain });
-const { encryptedString, symmetricKey } = await LitJsSdk.encryptString(str);
-
-const encryptedSymmetricKey = await this.litNodeClient.saveEncryptionKey({
-  accessControlConditions: accessControlConditionsNFT,
-  symmetricKey,
-  authSig,
-  chain,
-});
-
-return {
-  encryptedFile: encryptedString,
-  encryptedSymmetricKey: LitJsSdk.uint8arrayToString(encryptedSymmetricKey, "base16")
-};
+try {
+      return await LitJsSdk.encryptString({
+        dataToEncrypt: url,
+        chain,
+        authSig,
+        accessControlConditions: accs,
+      }, litNodeClient);
+    } catch (e) {
+      throw new Error('Unable to encrypt content: ' + e);
+}
 ```
 
-Go to the App.js file. Within the App function, add in two states to keep track of the encrypted URL array and the encrypted symmetric key array. 
+Go to the App.js file. Within the App function, add in two states to keep track of the encrypted ciphers and the encrypted hash. Another way, that will make it easier to track the encrypted material is to make a map of the pairs. Each pair, the cipher and the encrypted hash, are needed at the decryption step. 
 
 ```jsx
-const [encryptedUrlArr, setEncryptedUrlArr] = useState([]);
-const [encryptedKeyArr, setEncryptedKeyArr] = useState([]);
+  const [encryptedCipherArr, setEncryptedCipherArr] = useState([]);
+  const [encryptedEncryptedHashArr, setEncryptedHashArr] = useState([]);
 ```
 
 Within the handleSubmit function, add in your call to encrypt the URL. This should happen after the file has been uploaded to IPFS and a path is obtained. The created variable will hold a CID (a unique content identifier) and a string path. In order to obtain the URL to IPFS, we will use the path to construct the URL. 
@@ -154,8 +158,8 @@ async function handleSubmit(e) {
 
       const encrypted = await lit.encryptString(url);
 
-      setEncryptedUrlArr((prev) => [...prev, encrypted.encryptedFile]);
-      setEncryptedKeyArr((prev) => [...prev, encrypted.encryptedSymmetricKey]);
+      setEncryptedCipherArr((prev) => [...prev, encrypted.ciphertext]);
+      setEncryptedHashArr((prev) => [...prev, encrypted.dataToEncryptHash]);
     } catch (error) {
       console.log(error.message);
     }
@@ -166,24 +170,24 @@ To check if we’re on the correct path, we can add in a few console logs to che
 
 For the following IPFS url:
 
-[`https://infura-ipfs.io/ipfs/QmZDBKSsgRaESLH3TZJgwShubQo5omuoy1yoRn1ksTDnjm`](https://infura-ipfs.io/ipfs/QmZDBKSsgRaESLH3TZJgwShubQo5omuoy1yoRn1ksTDnjm)
+[`https://infura-ipfs.io/ipfs/QmQFuqBx1AuYXJvpvJVuHUSRJaRoSovfTuJTG45PpbdcV1`](https://infura-ipfs.io/ipfs/QmQFuqBx1AuYXJvpvJVuHUSRJaRoSovfTuJTG45PpbdcV1)
 
-The Lit encrypted object returned from encryptString( ) should look like:
-
-![Encrypted obj view](/public/encrypted_obj.png)
+The `cipherText` and `dataToEncryptHash` returned from encryptString( ) should look like:
+```js
+ciphertext:  gOlj+FWgJICGj8I4t6YKyDz6CK69069OuJOw7rQcEGr+2DgGpGxUSb9SRDIXeOoJTR6E0G0PJZA73mmczuPKvIvZpA8JCRTLSFQdwCQNxchLLquevGRSIZ8/N88NK11Ye8pJwpiQ7sZrsYnXAdU09/ZOXdpP1aN4ThfLoRy+1U4pm/TEz0MWKrlhGTHmIyDqqjktq5g01C+maS1QAw==
+dataToEncryptHash:  e80a752fbee810acddc149888a19a84a6e4fd1a4b50cea7ca4bec7021f97262d
+```
 
 ## **Decrypt and Display**
 
 ![Decrypt](/public/decrypt.png)
 
-Within our lit.js file, we create a decryptString function that will take in the encrypted string and the encrypted symmetric key and pass back a decrypted file if we hold the correct conditions to decrypt. 
+Within our lit.js file, we create a decryptString function that will take in the encrypted string and the data encrypted hash and pass back a decrypted string if we hold the correct conditions to decrypt. 
 
 Lit functions explained:
 
 - **checkAndSignAuthMessage**: Checks for an existing cryptographic authentication signature and creates one if it doesn’t exist. This is used to prove ownership of a given wallet address to the Lit nodes.
-- **getEncryptionKey**: Retrieves the symmetric encryption key from the LIT nodes. 
-Note that this will only work if the current wallet meets the access control conditions specified when the data was encrypted.
-- **decryptString**: Decrypt a string that was encrypted using the Lit Node Client encryptString function.
+- **decryptToString**: Decrypt a string that was encrypted using the Lit Node Client encryptString function.
 
 ```jsx
 async decryptString(encryptedStr, encryptedSymmetricKey) {
@@ -192,20 +196,19 @@ async decryptString(encryptedStr, encryptedSymmetricKey) {
     }
 
     const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain })
-
-    const symmetricKey = await this.litNodeClient.getEncryptionKey({
-      accessControlConditions: accessControlConditionsNFT,
-      toDecrypt: encryptedSymmetricKey,
-      chain,
-      authSig
-    })
-
-    const decryptedFile = await LitJsSdk.decryptString(
-      encryptedStr,
-      symmetricKey
-    );
-
-    return { decryptedFile }
+    try {
+      return await LitJsSdk.decryptToString(
+        {
+          accessControlConditions: accs,
+          ciphertext,
+          dataToEncryptHash,
+          authSig,
+          chain,
+        }, litNodeClient
+      );
+    } catch (e) {
+      throw new Error('Unable to decrypt content: ' + e);
+    }
   }
 ```
 
@@ -223,7 +226,7 @@ function decrypt() {
       return lit.decryptString(url, encryptedKeyArr[idx]);
     })).then((values) => {
       setDecryptedFileArr(values.map((v) => {
-        return v.decryptedFile;
+        return v;
       }));
     });
   }
@@ -234,58 +237,18 @@ Finally, within the JSX at the bottom of the App.js file, update the div labeled
 ```jsx
 <div className="display">
   {decryptedFileArr.length !== 0
-    ? decryptedFileArr.map((el) => <img src={el} alt="nfts" />) : <h3>Upload data</h3>}
+    ? decryptedFileArr.map((el) => <img src={el} alt="images" />) : <h3>Upload data</h3>}
 </div>
 ```
 
 Congrats! We now have a decentralized application that utilizes Lit to encrypt and decrypt files stored on IPFS. 
 
 ### Additional Examples Using Lit Protocol
-
-If you want to an environment to upload files to IPFS and set access controls through an interface, check out the [Lit Gateway IPFS application](https://litgateway.com/files). From this interface, you will be able to share links to files with custom access controls. 
-
-![Lit Gateway](/public/litGateway.png)
-
-Here is a [link](https://litgateway.com/files/view/176269be-e905-4c12-8cfc-aa580d244f19) to a file that you can only view if you have at least one Monster Suit NFT. 
-
-Check out [Lit Token Access](https://litgateway.com/apps/shopify), a way to add token-gating to your Shopify store.
+![React Example in JS-SDK](/public/lit_encrypt_react.png)
+Check out [this example React application](https://github.com/LIT-Protocol/js-sdk/tree/feat/SDK-V3/apps/demo-encrypt-decrypt-react) that encrypts and decrypts a **string** using the Lit JS SDK V3. This gives an overview of the time it takes to encrypt and decrypt a simple string.
 
 ## The Lit Future
 
-So you’re thinking, Lit Protocol is pretty cool and can do some awesome things around privacy that is widely missing from the decentralized web. It gets better; imagine smart contracts that can read and write from any HTTP endpoint, blockchain, state machine, or decentralized storage system. Let's say this smart contract could also have its own public and private key pair, just like a blockchain wallet.
+So you’re thinking, Lit Protocol is pretty cool and can do some awesome things around privacy that is widely missing from the decentralized web. Learn more about Lit through the [developer docs](https://developer.litprotocol.com/).
 
-We're calling these super-powered smart contracts [Lit Actions](https://developer.litprotocol.com/coreConcepts/LitActionsAndPKPs/litActions). They are Javascript smart contracts that have network access and can make HTTP requests. The public and private keys are called [programmable key pairs (PKPs)](https://developer.litprotocol.com/coreConcepts/LitActionsAndPKPs/PKPs).
-
-**How does it work?**
-
-A user can generate a new PKP and can grant a Lit Action the right to sign using the PKP. Lit Actions are like smart contracts with a secret key that can be used to sign or decrypt content.
-
-**How does this tie in with unlockable content?**
-
-A wallet now becomes programmable. If unlockable content with NFTs opens up a world for decentralized, encryptable content Lit Actions and PKPs add in programmable, private actions to that landscape. An NFT becomes an authorization signature to run a smart contract.
-
-![Lit Actions & PKP's](/public/litActionsPKPs.png)
-
-### Possibilities of Lit Actions and PKPs
-
-Web3 Social
-Social applications that empower users with privacy and true data ownership.
-- Credentialing systems for privacy-preserving web3 login.
-- User owned social graphs.
-- Account abstraction with support for web2 auth methods (i.e. Apple Passkey).
-- Decentralized chat bots.
-- Verifiable, on-chain reputation building.
-
-DeFi
-Condition-based transaction execution (ex. on-chain limit orders).
-- Automated, recurring payments.
-- Liquid staking solutions.
-- Frictionless transaction execution (signing abstraction).
-- Vault applications for seamlessly trading asset “bundles”.
-
-Infrastructure
-- Cross-chain bridges.
-- Oracles for off-chain data.
-- Event listening and condition-based execution.
-- Privacy-preserving transactions.
-- Decentralized key custodians.
+In the coming months, we'll be releasing some awesome features to help you build quickly and easily. Allowing builders to seamlessly add automated signing to their applications, all without the stress of managing keys.

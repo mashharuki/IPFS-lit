@@ -44,7 +44,7 @@ function App() {
         return lit.decryptString(url, encryptedEncryptedHashArr[idx]);
       })).then((values) => {
         setDecryptedFileArr(values.map((v) => {
-          return v.decryptedFile;
+          return v;
         }));
       });
     }
@@ -86,7 +86,7 @@ function App() {
         <button className="button" onClick={decrypt}>Decrypt</button>
         <div className="display">
           {decryptedFileArr.length !== 0
-            ? decryptedFileArr.map((el) => <img src={el} alt="nfts" />) : <h3>Upload data, please! </h3>}
+            ? decryptedFileArr.map((el) => <img src={el} alt={'alt'} style={{width:'500px', height: '600px;'}}/>) : <h3>Upload data, please! </h3>}
         </div>
       </div>
     </div>

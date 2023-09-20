@@ -23,50 +23,49 @@ const accs = [
   }
 ]
 
-class Lit {
+class Lit {  
+  client
   async connect() {
-    await litNodeClient.connect()
+    await litNodeClient.connect();
+    this.client = litNodeClient;
   }
 
   async encryptString(url) {
-    if (!litNodeClient) {
+    if (!this.client) {
       await this.connect()
     }
-
-    console.log('url of uploaded file ', url);
     const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'ethereum' });
 
     try {
-      const encrypted = await LitJsSdk.encryptString({
+      return await LitJsSdk.encryptString({
         dataToEncrypt: url,
         chain,
         authSig,
         accessControlConditions: accs,
       }, litNodeClient);
-
-      return encrypted;
     } catch (e) {
+      console.log(e);
       throw new Error('Unable to encrypt content: ' + e);
     }
   }
 
   async decryptString(ciphertext, dataToEncryptHash) {
-    if (!litNodeClient) {
+    if (!this.client) {
       await this.connect()
     }
     const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain });
 
     console.log('ciphertext: ', ciphertext);
-    console.log('data to encrypt: ', ciphertext);
+    console.log('data to decrypt: ', ciphertext);
     try {
-      return await this.litNodeClient.decryptToString(
+      return await LitJsSdk.decryptToString(
         {
           accessControlConditions: accs,
           ciphertext,
           dataToEncryptHash,
           authSig,
           chain,
-        },
+        }, litNodeClient
       );
     } catch (e) {
       throw new Error('Unable to decrypt content: ' + e);
