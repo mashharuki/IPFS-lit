@@ -104,8 +104,6 @@ const accessControlConditionsNFT = [
 
 ## **Encrypt and Upload**
 
-![Encrypt with Lit](/public/encrypt.png)
-
 Within your lit.js file, add an encryptString function. 
 
 ```jsx
@@ -179,8 +177,6 @@ dataToEncryptHash:  e80a752fbee810acddc149888a19a84a6e4fd1a4b50cea7ca4bec7021f97
 ```
 
 ## **Decrypt and Display**
-
-![Decrypt](/public/decrypt.png)
 
 Within our lit.js file, we create a decryptString function that will take in the encrypted string and the data encrypted hash and pass back a decrypted string if we hold the correct conditions to decrypt. 
 
