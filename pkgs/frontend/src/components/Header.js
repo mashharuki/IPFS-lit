@@ -1,3 +1,8 @@
+/**
+ * Header コンポーネント
+ * @param {*} param0 
+ * @returns 
+ */
 const Header = ({title}) => {
     return (
         <>

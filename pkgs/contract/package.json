@@ -1,0 +1,30 @@
+{
+  "name": "contract",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "chai": "^4.3.4",
+    "chai-as-promised": "^7.1.1",
+    "chai-bignumber": "^3.0.0",
+    "truffle": "^5.4.16"
+  },
+  "scripts": {
+    "clean": "truffle clean",
+    "test": "truffle test",
+    "compile": "truffle compile"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": []
+  }
+}
