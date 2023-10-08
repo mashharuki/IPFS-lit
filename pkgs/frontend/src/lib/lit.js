@@ -40,14 +40,25 @@ const accessControlConditionsNFT = [
     }
   ]
 
+/**
+ * Lit SDK用のクラス
+ */
 class Lit {
   litNodeClient
 
+  /**
+   * 接続
+   */
   async connect() {
     await client.connect()
     this.litNodeClient = client
   }
 
+  /**
+   * 暗号化
+   * @param {*} str 
+   * @returns 
+   */
   async encryptString(str) {
     if (!this.litNodeClient) {
       await this.connect()
