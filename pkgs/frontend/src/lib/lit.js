@@ -81,7 +81,7 @@ class Lit {
     });
 
     console.log('ciphertext: ', ciphertext);
-    console.log('data to decrypt: ', ciphertext);
+    console.log('data to decrypt: ', dataToEncryptHash);
 
     try {
       // decrypToString methodをコール
